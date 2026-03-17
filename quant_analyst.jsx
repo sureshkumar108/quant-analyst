@@ -123,6 +123,7 @@ const geoEmoji = g => ({'North America':'🇺🇸','Europe':'🇪🇺','Asia Pac
 const sigIcon = t => ({'Patent Spike':'🔬','Capital Inflow':'💰','Regulatory Tailwind':'⚖️','Market Gap':'🎯','Tech Breakthrough':'⚡','Founder Pedigree':'👤'}[t]||'📡');
 const now = () => new Date().toISOString();
 const fmt = d => new Date(d).toLocaleTimeString('en-US',{hour12:false});
+const sourceStatusColor = s => ({online:'var(--green)',warning:'var(--yellow)',disabled:'var(--dim)',offline:'var(--red)'}[s]||'var(--dim)');
 
 // ─── MICRO COMPONENTS ─────────────────────────────────────────────────────────
 const Dot = ({color,pulse}) => (
@@ -206,7 +207,7 @@ const DealCard = ({deal,onDiscord,onSelect,compact}) => {
             <span style={{fontSize:13}}>{sigIcon(deal.signal_type)}</span>
             <span style={{fontSize:11,color:'var(--yellow)',fontWeight:500}}>{deal.signal_type}</span>
             <span style={{color:'var(--dim)',fontSize:11}}>•</span>
-            <span style={{fontSize:11,color:'var(--dim)'}}>{deal.estimated_valuation} est. val.</span>
+            {deal.estimated_valuation&&<span style={{fontSize:11,color:'var(--dim)'}}>{deal.estimated_valuation} est. val.</span>}
             {deal.funding_raised&&<><span style={{color:'var(--dim)',fontSize:11}}>•</span>
             <span style={{fontSize:11,color:'var(--green)'}}>{deal.funding_raised} raised</span></>}
           </div>
@@ -300,24 +301,29 @@ const LogPanel = ({logs}) => {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function QuantAnalyst() {
   const [tab,setTab] = useState('dashboard');
-  const [deals,setDeals] = useState(SEED_DEALS);
+  const [deals,setDeals] = useState([]);
   const [agentRunning,setAgentRunning] = useState(false);
   const [thesis,setThesis] = useState('');
   const [discordUrl,setDiscordUrl] = useState('');
   const [discordInput,setDiscordInput] = useState('');
   const [logs,setLogs] = useState([]);
   const [notifications,setNotifications] = useState([]);
-  const [marketSummary,setMarketSummary] = useState('Seed data loaded. Deploy the AI agent to surface live investment signals across global markets using LLM-powered semantic reasoning and real-time web intelligence.');
-  const [timeSignals,setTimeSignals] = useState(['Patent filing velocity in EU deep tech +230% YoY','DFI capital flows into African fintech crossing $2B threshold','SBIR/STTR grants to defense AI startups up 180% Q1 2026']);
+  const [marketSummary,setMarketSummary] = useState('Loading live SEC and research data...');
+  const [timeSignals,setTimeSignals] = useState([]);
   const [clock,setClock] = useState('');
   const [error,setError] = useState('');
-  const [sources,setSources] = useState({Patents:true,'SEC Filings':true,'Academic Papers':true,News:true,'Crunchbase':false});
+  const [sources,setSources] = useState({'SEC Filings':true,'Academic Papers':true});
   const [geoFilter,setGeoFilter] = useState('Global');
-  const [kpis,setKpis] = useState({ddr:73,ttm:4.2,apg:34,dix:0.67,isr:2.8});
+  const [kpis,setKpis] = useState({liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
   const [runCount,setRunCount] = useState(0);
   const [selectedDeal,setSelectedDeal] = useState(null);
   const [memoLoading,setMemoLoading] = useState(false);
   const [memo,setMemo] = useState('');
+  const [sourceStatus,setSourceStatus] = useState([]);
+  const [warnings,setWarnings] = useState([]);
+  const [latestRunDeals,setLatestRunDeals] = useState([]);
+  const [initialLoading,setInitialLoading] = useState(true);
+  const [lastUpdated,setLastUpdated] = useState('');
 
   // Live clock
   useEffect(()=>{
@@ -329,11 +335,50 @@ export default function QuantAnalyst() {
     setLogs(p=>[...p.slice(-79),{msg,type,ts:new Date().toTimeString().slice(0,8)}]);
   },[]);
 
+  const loadDashboard = useCallback(async()=>{
+    setInitialLoading(true);
+    setError('');
+    try{
+      const res = await fetch(`/api/bootstrap?geoFilter=${encodeURIComponent(geoFilter)}`);
+      const data = await res.json();
+      if(!res.ok||!data.ok)throw new Error(data.error||`HTTP ${res.status}`);
+      setDeals(data.deals||[]);
+      setLatestRunDeals([]);
+      setMarketSummary(data.marketSummary||'No live summary available.');
+      setTimeSignals(data.timeSignals||[]);
+      setKpis(data.kpis||{liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
+      setSourceStatus(data.sourceStatus||[]);
+      setWarnings(data.warnings||[]);
+      setLastUpdated(data.generatedAt||'');
+      if(data.defaultThesis)setThesis(prev=>prev.trim()?prev:data.defaultThesis);
+      addLog('Live dashboard bootstrap completed','success');
+    }catch(e){
+      setError(e.message);
+      setWarnings(['Live sources failed to load. Check SEC_USER_AGENT, network reachability, and provider availability.']);
+      addLog(`Bootstrap failed: ${e.message}`,'error');
+    }finally{
+      setInitialLoading(false);
+    }
+  },[geoFilter,addLog]);
+
+  useEffect(()=>{
+    loadDashboard();
+  },[loadDashboard]);
+
   // Discord send
   const sendDiscord = useCallback(async (deal)=>{
     if(!discordUrl){addLog('Discord webhook not configured','error');return;}
-    const color = deal.confidence_score>=80?0x00ff88:deal.confidence_score>=70?0xffd600:0xff8800;
     try{
+      const discordRes = await fetch('/api/discord',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({deal,webhookUrl:discordUrl})
+      });
+      const discordData = await discordRes.json();
+      if(!discordRes.ok||!discordData.ok)throw new Error(discordData.error||`Discord ${discordRes.status}`);
+      setNotifications(p=>[{deal,ts:discordData.sentAt||now(),status:'sent',channel:discordUrl.slice(-20)},...p]);
+      addLog(`âœ“ Discord notification sent â†’ ${deal.company}`,'success');
+      return;
       const res = await fetch(discordUrl,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
@@ -372,6 +417,15 @@ export default function QuantAnalyst() {
     if(!deal)return;
     setMemoLoading(true);setMemo('');
     try{
+      const memoRes = await fetch('/api/memo',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({deal})
+      });
+      const memoData = await memoRes.json();
+      if(!memoRes.ok||!memoData.ok)throw new Error(memoData.error||`Memo ${memoRes.status}`);
+      setMemo(memoData.memo||'');
+      return;
       const res = await fetch("https://api.anthropic.com/v1/messages",{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
@@ -399,13 +453,43 @@ export default function QuantAnalyst() {
     await new Promise(r=>setTimeout(r,400));
     addLog('Deploying web intelligence agents...','scan');
     await new Promise(r=>setTimeout(r,300));
-    addLog('Scanning patent databases (USPTO, EPO, WIPO)...','scan');
-    addLog('Ingesting SEC 10-K/10-Q regulatory filings...','scan');
-    addLog('Processing capital flow time-series data...','scan');
-    addLog('Cross-referencing academic preprint repositories...','scan');
-    addLog('Running RAG correlation engine...','system');
+    addLog('Requesting live SEC EDGAR feeds...','scan');
+    addLog('Pulling recent arXiv research matches...','scan');
+    addLog('Normalizing source documents into signal cards...','scan');
+    addLog('Scoring recency, match quality, and source coverage...','system');
 
     try{
+      const agentRes = await fetch('/api/run-agent',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({thesis,geoFilter,sources})
+      });
+      const agentData = await agentRes.json();
+      if(!agentRes.ok||!agentData.ok)throw new Error(agentData.error||`HTTP ${agentRes.status}`);
+      const liveDeals = agentData.deals||[];
+      setDeals(liveDeals);
+      setLatestRunDeals(liveDeals);
+      setMarketSummary(agentData.marketSummary||'No live summary available.');
+      setTimeSignals(agentData.timeSignals||[]);
+      setKpis(agentData.kpis||{liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
+      setSourceStatus(agentData.sourceStatus||[]);
+      setWarnings(agentData.warnings||[]);
+      setLastUpdated(agentData.generatedAt||'');
+      setRunCount(p=>p+1);
+      (agentData.trace||[]).forEach(line=>addLog(line,'system'));
+      const liveHighConf = liveDeals.filter(d=>d.confidence_score>=70).length;
+      const newDeals = liveDeals;
+      const hc = liveHighConf;
+      addLog(`âœ“ Found ${newDeals.length} live opportunities (${hc} high-confidence)`,'success');
+      const liveNotify = liveDeals.filter(d=>d.confidence_score>=75);
+      if(liveNotify.length&&discordUrl){
+        addLog(`Sending ${liveNotify.length} Discord alerts...`,'system');
+        for(const d of liveNotify){await sendDiscord(d);}
+      }else if(liveNotify.length&&!discordUrl){
+        addLog(`${liveNotify.length} high-confidence deals found. Configure Discord to receive alerts.`,'info');
+      }
+      addLog('â•â•â• AGENT CYCLE COMPLETE â•â•â•','system');
+      return;
       const userPrompt = `Investment Thesis: ${thesis}
 Geography Focus: ${geoFilter}
 Data Sources: ${activeSources.join(', ')}
@@ -433,16 +517,16 @@ Return ONLY valid JSON, no markdown, no backticks.`;
       if(jsonStart===-1||jsonEnd===-1)throw new Error('No JSON found in response');
       const result = JSON.parse(clean.slice(jsonStart,jsonEnd+1));
 
-      const newDeals = (result.deals||[]).map((d,i)=>({...d,id:`r${Date.now()}-${i}`}));
-      setDeals(p=>[...newDeals,...p]);
+      const llmNewDeals = (result.deals||[]).map((d,i)=>({...d,id:`r${Date.now()}-${i}`}));
+      setDeals(p=>[...llmNewDeals,...p]);
       if(result.market_summary)setMarketSummary(result.market_summary);
       if(result.time_series_signals?.length)setTimeSignals(result.time_series_signals.slice(0,4));
 
-      const hc = newDeals.filter(d=>d.confidence_score>=70).length;
+      const llmHc = llmNewDeals.filter(d=>d.confidence_score>=70).length;
       setKpis(p=>({
         ...p,
-        ddr:Math.round((hc/Math.max(newDeals.length,1))*100),
-        apg:p.apg+newDeals.length,
+        ddr:Math.round((llmHc/Math.max(llmNewDeals.length,1))*100),
+        apg:p.apg+llmNewDeals.length,
         ttm:+(Math.max(2.1,p.ttm*0.97)).toFixed(1)
       }));
       setRunCount(p=>p+1);
@@ -537,10 +621,10 @@ Return ONLY valid JSON, no markdown, no backticks.`;
           <div className="fade-in">
             {/* KPI Row */}
             <div style={{display:'flex',gap:12,marginBottom:24,flexWrap:'wrap'}}>
-              <KPICard label="Deal Discovery Rate" value={kpis.ddr} unit="%" sub={`${highConf.length} high-confidence deals`} trend={kpis.ddr-65} color='var(--green)'/>
-              <KPICard label="Time to First Memo" value={kpis.ttm} unit="min" sub="↓ 28% vs 35min baseline" trend={-28} color='var(--blue)'/>
-              <KPICard label="Deals / Analyst / Mo" value={kpis.apg} unit="" sub={`+${deals.length - SEED_DEALS.length} AI-sourced`} trend={kpis.apg>30?12:0} color='var(--yellow)'/>
-              <KPICard label="Avg Confidence Score" value={avgScore} unit="/100" sub="LLM-scored signal quality" color='var(--orange)'/>
+              <KPICard label="Live Filing Signals" value={kpis.liveDeals} unit="" sub={`${highConf.length} high-confidence deals`} color='var(--green)'/>
+              <KPICard label="Research Matches" value={kpis.researchSignals} unit="" sub="Recent arXiv thesis hits" color='var(--blue)'/>
+              <KPICard label="Source Coverage" value={kpis.sourceCoverage} unit={`/${sourceStatus.length||0}`} sub="Online or warning-state live sources" color='var(--yellow)'/>
+              <KPICard label="Avg Confidence Score" value={avgScore} unit="/100" sub="Recency and thesis-match score" color='var(--orange)'/>
               <KPICard label="Geographic Diversity" value={geoSpread} unit=" regions" sub={`${[...new Set(deals.map(d=>d.geography))].join(', ')}`} color='var(--purple)'/>
             </div>
 
@@ -558,6 +642,32 @@ Return ONLY valid JSON, no markdown, no backticks.`;
                       <Dot color={['var(--green)','var(--blue)','var(--yellow)','var(--purple)'][i%4]}/>
                       <span style={{fontSize:11,color:'var(--text)',lineHeight:1.5}}>{s}</span>
                     </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
+              <div style={{background:'var(--s2)',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
+                <div style={{fontSize:9,color:'var(--dim)',letterSpacing:2,textTransform:'uppercase',marginBottom:12}}>Source Health</div>
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {sourceStatus.map(source=>(
+                    <div key={source.key} style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
+                      <div>
+                        <div style={{fontSize:11,color:'var(--text)'}}>{source.label}</div>
+                        <div style={{fontSize:10,color:'var(--dim)',marginTop:3}}>{source.detail}</div>
+                      </div>
+                      <Badge color={sourceStatusColor(source.status)} small>{source.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{background:'var(--s2)',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
+                <div style={{fontSize:9,color:'var(--dim)',letterSpacing:2,textTransform:'uppercase',marginBottom:12}}>Live Data Notes</div>
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {initialLoading&&<div style={{fontSize:11,color:'var(--blue)'}}>Refreshing live sources...</div>}
+                  {(warnings.length?warnings:['No provider warnings reported.']).map((warning,i)=>(
+                    <div key={i} style={{fontSize:11,color:i===0&&warnings.length?'var(--yellow)':'var(--dim)',lineHeight:1.6}}>{warning}</div>
                   ))}
                 </div>
               </div>
@@ -603,7 +713,7 @@ Return ONLY valid JSON, no markdown, no backticks.`;
                   <div style={{fontSize:9,color:'var(--dim)',letterSpacing:2,textTransform:'uppercase',marginBottom:14}}>⟁ Investment Thesis</div>
                   <textarea
                     value={thesis}onChange={e=>setThesis(e.target.value)}
-                    placeholder="Describe your investment thesis. The AI agent will synthesize real-time web intelligence, patent data, capital flows, and SEC filings to surface opportunities matching your criteria..."
+                    placeholder="Describe your investment thesis. The live scan will query SEC EDGAR filings, recent arXiv research, and optional server-side memo enrichment to surface current opportunities matching your criteria..."
                     style={{width:'100%',height:120,padding:'10px 14px',resize:'vertical',fontSize:12,lineHeight:1.7,color:'var(--text)'}}
                   />
                   <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
@@ -631,6 +741,14 @@ Return ONLY valid JSON, no markdown, no backticks.`;
                         <input type="checkbox" checked={v} onChange={()=>setSources(p=>({...p,[k]:!p[k]}))} style={{accentColor:'var(--green)',width:12,height:12}}/>
                         <span style={{fontSize:11,color:v?'var(--green)':'var(--dim)'}}>{k}</span>
                       </label>
+                    ))}
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:12}}>
+                    {sourceStatus.map(source=>(
+                      <div key={source.key} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:10,color:'var(--dim)'}}>
+                        <span>{source.label}</span>
+                        <span style={{color:sourceStatusColor(source.status)}}>{source.detail}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -696,11 +814,11 @@ Return ONLY valid JSON, no markdown, no backticks.`;
             </div>
 
             {/* Results below */}
-            {deals.filter(d=>d.id.startsWith('r')).length>0&&(
+            {latestRunDeals.length>0&&(
               <div style={{marginTop:24}}>
                 <div style={{fontSize:9,color:'var(--dim)',letterSpacing:2,textTransform:'uppercase',marginBottom:12}}>⟁ AI-Sourced Opportunities</div>
                 <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                  {deals.filter(d=>d.id.startsWith('r')).map(d=>(
+                  {latestRunDeals.map(d=>(
                     <DealCard key={d.id} deal={d} onDiscord={sendDiscord} onSelect={d=>{setSelectedDeal(d);generateMemo(d);}}/>
                   ))}
                 </div>
@@ -858,11 +976,11 @@ Return ONLY valid JSON, no markdown, no backticks.`;
               <div style={{fontSize:9,color:'var(--dim)',letterSpacing:2,textTransform:'uppercase',marginBottom:14}}>◈ KPI Performance Dashboard</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:12}}>
                 {[
-                  {label:'Deal Discovery Rate',desc:'AI-identified startups passing analyst screen',value:`${kpis.ddr}%`,target:'Target: >70%',color:'var(--green)',ok:kpis.ddr>=70},
-                  {label:'Time to First Memo',desc:'Avg minutes to produce preliminary memo',value:`${kpis.ttm}min`,target:'Target: <5min (vs 35 baseline)',color:'var(--blue)',ok:kpis.ttm<5},
-                  {label:'Analyst Productivity',desc:'Deals reviewed per analyst per month',value:`${kpis.apg}`,target:'Target: +25% uplift',color:'var(--yellow)',ok:kpis.apg>30},
-                  {label:'Success Rate (IRR proxy)',desc:'AI-sourced deal portfolio MOIC',value:`${kpis.isr}x`,target:'Target: >2.5x MOIC',color:'var(--orange)',ok:kpis.isr>=2.5},
-                  {label:'Diversity Index',desc:'Geographic & founder diversity score',value:`${kpis.dix.toFixed(2)}`,target:'Target: >0.65 (Simpson Index)',color:'var(--purple)',ok:kpis.dix>=0.65},
+                  {label:'High-Confidence Share',desc:'Signals scoring 70 or higher from live sources',value:`${kpis.ddr}%`,target:'Target: >70%',color:'var(--green)',ok:kpis.ddr>=70},
+                  {label:'Scan Latency',desc:'Live source round-trip time for the latest run',value:`${kpis.ttm}min`,target:'Target: <1min',color:'var(--blue)',ok:kpis.ttm<1},
+                  {label:'Live Signal Count',desc:'Current opportunities in the active pipeline',value:`${kpis.apg}`,target:'Target: >0',color:'var(--yellow)',ok:kpis.apg>0},
+                  {label:'Research Coverage',desc:'Recent arXiv matches supporting the thesis',value:`${kpis.researchSignals}`,target:'Target: >0',color:'var(--orange)',ok:kpis.researchSignals>0},
+                  {label:'Diversity Index',desc:'Geographic dispersion across current live deals',value:`${kpis.dix.toFixed(2)}`,target:'Target: >0.65',color:'var(--purple)',ok:kpis.dix>=0.65},
                 ].map(k=>(
                   <div key={k.label} style={{background:'var(--s2)',border:`1px solid ${k.ok?k.color:'var(--border)'}`,borderRadius:8,padding:16,borderTop:`3px solid ${k.color}`}}>
                     <div style={{fontSize:9,color:'var(--dim)',letterSpacing:1,textTransform:'uppercase',marginBottom:8}}>{k.label}</div>
