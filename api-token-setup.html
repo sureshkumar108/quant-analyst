@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuantAI Token Setup Guide</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;600&display=swap");
+
+      :root {
+        --bg: #041017;
+        --panel: rgba(8, 20, 31, 0.82);
+        --panel-2: rgba(10, 28, 41, 0.92);
+        --text: #d7e5f2;
+        --muted: #7892a8;
+        --line: rgba(92, 133, 167, 0.25);
+        --line-strong: rgba(120, 179, 225, 0.45);
+        --green: #66f7b1;
+        --cyan: #5bd6ff;
+        --gold: #ffd86b;
+        --red: #ff6f86;
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+        --mono: "JetBrains Mono", monospace;
+        --display: "Orbitron", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family: var(--mono);
+        background:
+          radial-gradient(circle at top left, rgba(91, 214, 255, 0.16), transparent 30%),
+          radial-gradient(circle at top right, rgba(102, 247, 177, 0.12), transparent 25%),
+          linear-gradient(180deg, #06111a 0%, #041017 42%, #071520 100%);
+      }
+
+      a {
+        color: var(--cyan);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .shell {
+        width: min(1400px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 56px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 36px;
+        border: 1px solid var(--line-strong);
+        border-radius: 28px;
+        background:
+          linear-gradient(135deg, rgba(13, 29, 43, 0.96), rgba(8, 20, 31, 0.86)),
+          linear-gradient(120deg, rgba(102, 247, 177, 0.06), rgba(91, 214, 255, 0.04));
+        box-shadow: var(--shadow);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -10% -30% auto;
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(102, 247, 177, 0.15), transparent 65%);
+        pointer-events: none;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(91, 214, 255, 0.08);
+        border: 1px solid rgba(91, 214, 255, 0.22);
+        font-size: 12px;
+        color: var(--cyan);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero h1 {
+        margin: 18px 0 14px;
+        font-family: var(--display);
+        font-size: clamp(34px, 5vw, 60px);
+        line-height: 1.05;
+        letter-spacing: 0.04em;
+      }
+
+      .hero p {
+        max-width: 920px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.85;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.6fr 0.9fr;
+        gap: 24px;
+        margin-top: 26px;
+      }
+
+      .hero-card {
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(8, 20, 31, 0.68);
+      }
+
+      .hero-card h2 {
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: var(--gold);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .hero-card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text);
+        line-height: 1.8;
+        font-size: 13px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 24px;
+        margin-top: 24px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 18px;
+        align-self: start;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .sidebar h2 {
+        margin: 0 0 14px;
+        font-size: 12px;
+        color: var(--gold);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .sidebar a {
+        display: block;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        border-radius: 12px;
+        color: var(--text);
+        background: rgba(17, 37, 56, 0.58);
+        border: 1px solid transparent;
+      }
+
+      .sidebar a:hover {
+        border-color: rgba(91, 214, 255, 0.24);
+        background: rgba(17, 37, 56, 0.85);
+        text-decoration: none;
+      }
+
+      .sidebar .note {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(255, 111, 134, 0.08);
+        border: 1px solid rgba(255, 111, 134, 0.18);
+        color: #f3c2cb;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .content {
+        display: grid;
+        gap: 18px;
+      }
+
+      .section,
+      .provider {
+        padding: 24px;
+        border-radius: 26px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .section h2,
+      .provider h2 {
+        margin: 0 0 14px;
+        font-family: var(--display);
+        font-size: 24px;
+        letter-spacing: 0.04em;
+      }
+
+      .section p,
+      .provider p {
+        margin: 0 0 14px;
+        color: var(--muted);
+        line-height: 1.8;
+        font-size: 14px;
+      }
+
+      .env-box {
+        padding: 18px;
+        border-radius: 18px;
+        background: #07111b;
+        border: 1px solid rgba(102, 247, 177, 0.18);
+        overflow-x: auto;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .steps {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 46px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(9, 21, 33, 0.76);
+        border: 1px solid rgba(92, 133, 167, 0.18);
+      }
+
+      .step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, rgba(91, 214, 255, 0.18), rgba(102, 247, 177, 0.14));
+        border: 1px solid rgba(91, 214, 255, 0.25);
+        color: var(--cyan);
+        font-family: var(--display);
+        font-size: 18px;
+      }
+
+      .step h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        color: var(--text);
+      }
+
+      .step p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+
+      .provider-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: start;
+        margin-bottom: 16px;
+      }
+
+      .provider-meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border: 1px solid;
+      }
+
+      .pill.var {
+        color: var(--green);
+        background: rgba(102, 247, 177, 0.09);
+        border-color: rgba(102, 247, 177, 0.24);
+      }
+
+      .pill.cost {
+        color: var(--gold);
+        background: rgba(255, 216, 107, 0.08);
+        border-color: rgba(255, 216, 107, 0.22);
+      }
+
+      .pill.type {
+        color: var(--cyan);
+        background: rgba(91, 214, 255, 0.08);
+        border-color: rgba(91, 214, 255, 0.22);
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .link-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 14px;
+        border-radius: 14px;
+        background: rgba(91, 214, 255, 0.08);
+        border: 1px solid rgba(91, 214, 255, 0.18);
+        color: var(--cyan);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .callout {
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 216, 107, 0.08);
+        border: 1px solid rgba(255, 216, 107, 0.2);
+        color: #f2df9f;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .checklist {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .check {
+        display: flex;
+        gap: 10px;
+        align-items: start;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(9, 21, 33, 0.76);
+        border: 1px solid rgba(92, 133, 167, 0.16);
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .check::before {
+        content: ">";
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 24px;
+        padding: 18px 22px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(8, 20, 31, 0.72);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.8;
+      }
+
+      @media (max-width: 1120px) {
+        .layout,
+        .hero-grid,
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          width: min(100% - 20px, 1400px);
+          padding-top: 12px;
+        }
+
+        .hero,
+        .section,
+        .provider {
+          padding: 18px;
+          border-radius: 20px;
+        }
+
+        .provider-header {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <div class="eyebrow">QuantAI Operator Guide</div>
+        <h1>API Token Setup, Step by Step</h1>
+        <p>
+          This page is a followable setup guide for the tokens used by the QuantAI day-trading scan.
+          Work top to bottom. Add each credential to <code>.env.local</code>, then enable that source
+          in the app only after the token is in place.
+        </p>
+
+        <div class="hero-grid">
+          <div class="hero-card">
+            <h2>Recommended Start</h2>
+            <ul>
+              <li>Step 1: set <code>SEC_USER_AGENT</code></li>
+              <li>Step 2: get <code>FMP_API_KEY</code> for news plus breakout confirmation</li>
+              <li>Step 3: get <code>X_BEARER_TOKEN</code> for social catalyst scanning</li>
+              <li>Step 4: add either <code>BENZINGA_API_TOKEN</code> or Alpaca news keys</li>
+              <li>Step 5: add Discord and Anthropic only if you want alerts and memo generation</li>
+            </ul>
+          </div>
+          <div class="hero-card">
+            <h2>Important Rules</h2>
+            <ul>
+              <li>Never paste keys into the React file or commit them to Git.</li>
+              <li>Put secrets only in <code>.env.local</code>.</li>
+              <li>Enable each source in the UI only after its token is set.</li>
+              <li>As of March 18, 2026, pricing and access notes below match current public docs.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <h2>Jump To</h2>
+          <a href="#env">1. Environment File</a>
+          <a href="#sec">2. SEC EDGAR</a>
+          <a href="#x">3. X API</a>
+          <a href="#benzinga">4. Benzinga</a>
+          <a href="#alpaca">5. Alpaca</a>
+          <a href="#fmp">6. Financial Modeling Prep</a>
+          <a href="#anthropic">7. Anthropic</a>
+          <a href="#discord">8. Discord</a>
+          <a href="#finish">9. Final Checklist</a>
+          <div class="note">
+            If you only want the fastest usable stack, start with SEC + FMP + X. Add Benzinga next if
+            you want a stronger breaking-news feed.
+          </div>
+        </aside>
+
+        <main class="content">
+          <section class="section" id="env">
+            <h2>1. Create Your Environment File</h2>
+            <p>
+              In the project root, copy <code>.env.example</code> to <code>.env.local</code>. Then paste
+              the keys you collect into the matching variables below.
+            </p>
+            <div class="env-box">
+              <pre>SEC_USER_AGENT=quant-analyst/1.0 (your-email@example.com)
+X_BEARER_TOKEN=
+BENZINGA_API_TOKEN=
+APCA_API_KEY_ID=
+APCA_API_SECRET_KEY=
+FMP_API_KEY=
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+DISCORD_WEBHOOK_URL=</pre>
+            </div>
+            <div class="checklist">
+              <div class="check">Create <code>.env.local</code> before collecting tokens.</div>
+              <div class="check">Save after every credential so you do not lose track.</div>
+              <div class="check">Do not share screenshots of this file once it contains real secrets.</div>
+            </div>
+          </section>
+
+          <section class="provider" id="sec">
+            <div class="provider-header">
+              <div>
+                <h2>2. SEC EDGAR</h2>
+                <p>
+                  This source does not use an API key. It only needs a real contact-style user agent so
+                  SEC requests identify your application properly.
+                </p>
+              </div>
+              <div class="provider-meta">
+                <span class="pill var">SEC_USER_AGENT</span>
+                <span class="pill cost">Free</span>
+                <span class="pill type">Required Base Feed</span>
+              </div>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>
+                  <h3>No signup needed</h3>
+                  <p>SEC EDGAR is public. You do not create an API account for this app flow.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>
+                  <h3>Set a real contact string</h3>
+                  <p>
+                    In <code>.env.local</code>, use something like
+                    <code>quant-analyst/1.0 (you@example.com)</code>.
+                  </p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>
+                  <h3>Keep it accurate</h3>
+                  <p>Do not use a fake email. SEC fair-access guidance expects a real contact identity.</p>
+                </div>
+              </div>
+            </div>
+            <div class="links">
+              <a class="link-btn" href="https://www.sec.gov/os/accessing-edgar-data" target="_blank" rel="noreferrer">SEC Access Guidance</a>
+              <a class="link-btn" href="https://www.sec.gov/edgar/search/" target="_blank" rel="noreferrer">EDGAR Search</a>
+            </div>
+          </section>
+
+          <section class="provider" id="x">
+            <div class="provider-header">
+              <div>
+                <h2>3. X API</h2>
+                <p>
+                  Use X for social catalyst posts, rumor velocity, journalist headlines, and cashtag-based
+                  news breaks. This app currently uses recent search, not a persistent stream worker.
+                </p>
+              </div>
+              <div class="provider-meta">
+                <span class="pill var">X_BEARER_TOKEN</span>
+                <span class="pill cost">Pay Per Usage</span>
+                <span class="pill type">Social Feed</span>
+              </div>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>
+                  <h3>Open the X developer console</h3>
+                  <p>Go to the X Developer Portal and sign in with your X account.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>
+                  <h3>Create a project and app</h3>
+                  <p>If you do not already have one, create a project, then create an app under it.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>
+                  <h3>Open Keys and Tokens</h3>
+                  <p>Inside the app, find the <strong>Keys and Tokens</strong> area.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div>
+                  <h3>Copy the Bearer Token</h3>
+                  <p>Paste it into <code>.env.local</code> as <code>X_BEARER_TOKEN=...</code>.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">5</div>
+                <div>
+                  <h3>Check billing and credits</h3>
+                  <p>
+                    As of March 18, 2026, X documents API pricing as pay per usage. The exact cost is shown
+                    in your developer console for your project.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="callout">
+              Public docs note a pay-per-use model and reference a 2 million Post-read monthly cap before
+              enterprise. Treat the Developer Console as the source of truth for your actual plan.
+            </div>
+            <div class="links">
+              <a class="link-btn" href="https://docs.x.com/x-api/getting-started/pricing" target="_blank" rel="noreferrer">Pricing</a>
+              <a class="link-btn" href="https://docs.x.com/fundamentals/developer-portal" target="_blank" rel="noreferrer">Developer Portal Guide</a>
+              <a class="link-btn" href="https://docs.x.com/fundamentals/authentication/oauth-2-0/bearer-tokens" target="_blank" rel="noreferrer">Bearer Token Docs</a>
+            </div>
+          </section>
+
+          <section class="provider" id="benzinga">
+            <div class="provider-header">
+              <div>
+                <h2>4. Benzinga News</h2>
+                <p>
+                  Benzinga is the strongest structured breaking-news source in this phase. It is a good add-on
+                  when you want cleaner tradable headlines than generic news APIs.
+                </p>
+              </div>
+              <div class="provider-meta">
+                <span class="pill var">BENZINGA_API_TOKEN</span>
+                <span class="pill cost">Contact Sales / Trial</span>
+                <span class="pill type">Breaking News</span>
+              </div>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>
+                  <h3>Request access</h3>
+                  <p>Open the Benzinga API site and request a trial or data-partner access for the news feed.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>
+                  <h3>Create or confirm your Benzinga API account</h3>
+                  <p>You need an issued API key or token from their platform or sales flow.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>
+                  <h3>Copy the API token</h3>
+                  <p>Paste it into <code>.env.local</code> as <code>BENZINGA_API_TOKEN=...</code>.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div>
+                  <h3>Enable the source in the app</h3>
+                  <p>Once the token is saved, turn on <strong>Benzinga News</strong> in the source list.</p>
+                </div>
+              </div>
+            </div>
+            <div class="callout">
+              As of March 18, 2026, Benzinga does not publicly post standard production pricing on the docs
+              pages. Expect trial onboarding or a partner/sales conversation.
+            </div>
+            <div class="links">
+              <a class="link-btn" href="https://www.benzinga.com/apis/in/request-trial/" target="_blank" rel="noreferrer">Request Trial</a>
+              <a class="link-btn" href="https://docs.benzinga.com/introduction/welcome" target="_blank" rel="noreferrer">Docs Home</a>
+              <a class="link-btn" href="https://docs.benzinga.com/api-reference/authentication" target="_blank" rel="noreferrer">Authentication</a>
+              <a class="link-btn" href="https://docs.benzinga.com/ws-reference/data-websocket/get-news-stream" target="_blank" rel="noreferrer">News Stream Docs</a>
+            </div>
+          </section>
+
+          <section class="provider" id="alpaca">
+            <div class="provider-header">
+              <div>
+                <h2>5. Alpaca News</h2>
+                <p>
+                  Alpaca is useful if you already use Alpaca for trading or market data. This app uses its
+                  historical news endpoint with your market-data credentials.
+                </p>
+              </div>
+              <div class="provider-meta">
+                <span class="pill var">APCA_API_KEY_ID</span>
+                <span class="pill var">APCA_API_SECRET_KEY</span>
+                <span class="pill cost">Basic Free / Plus $99</span>
+              </div>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>
+                  <h3>Create an Alpaca account</h3>
+                  <p>Sign up for Alpaca if you do not already have a trading or data account.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>
+                  <h3>Generate API keys in the dashboard</h3>
+                  <p>Copy both the key ID and secret. Alpaca issues them as a pair.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>
+                  <h3>Paste both values into <code>.env.local</code></h3>
+                  <p>
+                    Set <code>APCA_API_KEY_ID=...</code> and
+                    <code>APCA_API_SECRET_KEY=...</code>.
+                  </p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div>
+                  <h3>Use matching credentials</h3>
+                  <p>Be consistent about whether you use paper or live credentials.</p>
+                </div>
+              </div>
+            </div>
+            <div class="callout">
+              Current public market-data pricing shows Basic as free and Algo Trader Plus at $99/month.
+            </div>
+            <div class="links">
+              <a class="link-btn" href="https://docs.alpaca.markets/docs/about-market-data-api" target="_blank" rel="noreferrer">Market Data Pricing</a>
+              <a class="link-btn" href="https://docs.alpaca.markets/docs/api-references/trading-api/" target="_blank" rel="noreferrer">Trading API Docs</a>
+              <a class="link-btn" href="https://docs.alpaca.markets/docs/historical-news-data" target="_blank" rel="noreferrer">News Docs</a>
+            </div>
+          </section>
+
+          <section class="provider" id="fmp">
+            <div class="provider-header">
+              <div>
+                <h2>6. Financial Modeling Prep</h2>
+                <p>
+                  FMP is the most practical early subscription for this app because it contributes stock news,
+                  press releases, and quote-based breakout confirmation.
+                </p>
+              </div>
+              <div class="provider-meta">
+                <span class="pill var">FMP_API_KEY</span>
+                <span class="pill cost">Free / $22 / $59 / $149</span>
+                <span class="pill type">News + Quotes</span>
+              </div>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>
+                  <h3>Create an FMP account</h3>
+                  <p>Open Financial Modeling Prep and create your account.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>
+                  <h3>Open your dashboard</h3>
+                  <p>Your API key is shown in the account dashboard once the account is active.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>
+                  <h3>Copy the API key</h3>
+                  <p>Paste it into <code>.env.local</code> as <code>FMP_API_KEY=...</code>.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div>
+                  <h3>Use this source early</h3>
+                  <p>
+                    In this app, FMP does double duty: headline scanning and quote confirmation for breakout
+                    scoring. It is one of the highest-value first subscriptions.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="callout">
+              As of March 18, 2026, public pricing shows Basic free, Starter $22/month, Premium $59/month,
+              and Ultimate $149/month.
+            </div>
+            <div class="links">
+              <a class="link-btn" href="https://site.financialmodelingprep.com/developer/docs/pricing/" target="_blank" rel="noreferrer">Pricing</a>
+              <a class="link-btn" href="https://site.financialmodelingprep.com/developer/docs/quickstart" target="_blank" rel="noreferrer">Quickstart</a>
+              <a class="link-btn" href="https://site.financialmodelingprep.com/developer/docs/stable/stock-news" target="_blank" rel="noreferrer">Stock News</a>
+              <a class="link-btn" href="https://site.financialmodelingprep.com/developer/docs/stable/quote" target="_blank" rel="noreferrer">Quote Endpoint</a>
+            </div>
+          </section>
+
+          <div class="grid-2">
+            <section class="provider" id="anthropic">
+              <div class="provider-header">
+                <div>
+                  <h2>7. Anthropic</h2>
+                  <p>
+                    Anthropic is optional. It powers memo generation only. The scan itself still works without it.
+                  </p>
+                </div>
+                <div class="provider-meta">
+                  <span class="pill var">ANTHROPIC_API_KEY</span>
+                  <span class="pill cost">Usage Based</span>
+                </div>
+              </div>
+              <div class="steps">
+                <div class="step">
+                  <div class="step-num">1</div>
+                  <div>
+                    <h3>Open the Anthropic Console</h3>
+                    <p>Sign in to your Anthropic workspace.</p>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-num">2</div>
+                  <div>
+                    <h3>Create an API key</h3>
+                    <p>Generate the key from your workspace settings or API key section.</p>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-num">3</div>
+                  <div>
+                    <h3>Save it to <code>.env.local</code></h3>
+                    <p>Paste it as <code>ANTHROPIC_API_KEY=...</code>.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="links">
+                <a class="link-btn" href="https://docs.anthropic.com/en/api/getting-started" target="_blank" rel="noreferrer">Getting Started</a>
+                <a class="link-btn" href="https://anthropic.com/pricing" target="_blank" rel="noreferrer">Pricing</a>
+              </div>
+            </section>
+
+            <section class="provider" id="discord">
+              <div class="provider-header">
+                <div>
+                  <h2>8. Discord</h2>
+                  <p>
+                    Discord is optional. Use it only if you want alert delivery from the app into a channel.
+                  </p>
+                </div>
+                <div class="provider-meta">
+                  <span class="pill var">DISCORD_WEBHOOK_URL</span>
+                  <span class="pill cost">Free</span>
+                </div>
+              </div>
+              <div class="steps">
+                <div class="step">
+                  <div class="step-num">1</div>
+                  <div>
+                    <h3>Open your Discord server settings</h3>
+                    <p>Go to the channel or server integration settings where you want alerts.</p>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-num">2</div>
+                  <div>
+                    <h3>Create a webhook</h3>
+                    <p>Choose the destination channel and generate the webhook URL.</p>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-num">3</div>
+                  <div>
+                    <h3>Paste the full URL into <code>.env.local</code></h3>
+                    <p>Set <code>DISCORD_WEBHOOK_URL=...</code> and keep it secret.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="links">
+                <a class="link-btn" href="https://docs.discord.com/developers/resources/webhook" target="_blank" rel="noreferrer">Webhook Docs</a>
+                <a class="link-btn" href="https://support.discord.com/hc/en-us/articles/360045093012-Server-Integrations-Page" target="_blank" rel="noreferrer">Discord Help</a>
+              </div>
+            </section>
+          </div>
+
+          <section class="section" id="finish">
+            <h2>9. Final Checklist</h2>
+            <p>
+              Once your keys are in place, restart the local dev server so Vite reloads the server-side
+              environment variables.
+            </p>
+            <div class="checklist">
+              <div class="check">Save all keys in <code>.env.local</code>.</div>
+              <div class="check">Restart with <code>npm.cmd run dev</code>.</div>
+              <div class="check">Open the main app and enable only the providers you have configured.</div>
+              <div class="check">Run a scan and confirm provider health on the dashboard.</div>
+              <div class="check">If a provider shows disabled or offline, verify the exact env var name first.</div>
+            </div>
+            <div class="env-box" style="margin-top: 16px;">
+              <pre>Local URL:
+http://localhost:5173/api-token-setup.html</pre>
+            </div>
+          </section>
+
+          <footer>
+            This page is a setup guide for the current codebase in this repository. It does not store any token
+            values itself. Keep real keys out of Git, screenshots, and chat logs.
+          </footer>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createDefaultSourceSelection } from "./src/shared/source-options.js";
 
 // ─── FONTS & GLOBAL CSS ────────────────────────────────────────────────────────
 const INJECT_CSS = `
@@ -120,10 +121,19 @@ const sc = s => s >= 80 ? '#00ff88' : s >= 70 ? '#ffd600' : s >= 60 ? '#ff8800' 
 const sb = s => s >= 80 ? 'rgba(0,255,136,0.07)' : s >= 70 ? 'rgba(255,214,0,0.07)' : 'rgba(255,136,0,0.07)';
 const tc = t => t === 'High' ? '#ff3355' : t === 'Medium' ? '#ffd600' : '#00ff88';
 const geoEmoji = g => ({'North America':'🇺🇸','Europe':'🇪🇺','Asia Pacific':'🌏','Latin America':'🌎','Africa':'🌍','Middle East':'🕌'}[g]||'🌐');
-const sigIcon = t => ({'Patent Spike':'🔬','Capital Inflow':'💰','Regulatory Tailwind':'⚖️','Market Gap':'🎯','Tech Breakthrough':'⚡','Founder Pedigree':'👤'}[t]||'📡');
+const sigIcon = t => ({'Patent Spike':'🔬','Capital Inflow':'💰','Regulatory Tailwind':'⚖️','Market Gap':'🎯','Tech Breakthrough':'⚡','Founder Pedigree':'👤','News Break':'📰','Breakout':'📈'}[t]||'📡');
 const now = () => new Date().toISOString();
 const fmt = d => new Date(d).toLocaleTimeString('en-US',{hour12:false});
 const sourceStatusColor = s => ({online:'var(--green)',warning:'var(--yellow)',disabled:'var(--dim)',offline:'var(--red)'}[s]||'var(--dim)');
+const EMPTY_KPIS = {liveDeals:0,newsSignals:0,socialSignals:0,breakoutSignals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0};
+const SCAN_LOG_BY_SOURCE = {
+  'SEC Filings':'Querying live SEC EDGAR filings...',
+  'X Posts':'Scanning X API recent-search results...',
+  'Benzinga News':'Pulling Benzinga breaking-news feed...',
+  'Alpaca News':'Pulling Alpaca news feed...',
+  'FMP Stock News':'Loading FMP stock news, press releases, and quote confirmation...',
+  'Academic Papers':'Pulling arXiv context overlay...'
+};
 
 // ─── MICRO COMPONENTS ─────────────────────────────────────────────────────────
 const Dot = ({color,pulse}) => (
@@ -195,6 +205,7 @@ const DealCard = ({deal,onDiscord,onSelect,compact}) => {
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
             <span style={{fontFamily:'var(--display)',fontSize:compact?13:15,color:'var(--text)',fontWeight:600}}>{deal.company}</span>
+            {deal.ticker&&<Badge color='var(--blue)' small>{deal.ticker}</Badge>}
             <Badge color={sc(deal.confidence_score)} small>{deal.confidence_score}/100</Badge>
             <Badge color={tc(deal.time_sensitivity)} small>{deal.time_sensitivity} urgency</Badge>
           </div>
@@ -206,6 +217,10 @@ const DealCard = ({deal,onDiscord,onSelect,compact}) => {
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
             <span style={{fontSize:13}}>{sigIcon(deal.signal_type)}</span>
             <span style={{fontSize:11,color:'var(--yellow)',fontWeight:500}}>{deal.signal_type}</span>
+            {deal.breakout_score!==undefined&&<><span style={{color:'var(--dim)',fontSize:11}}>•</span>
+            <span style={{fontSize:11,color:'var(--blue)'}}>Breakout {deal.breakout_score}/100</span></>}
+            {deal.price_change_pct!==null&&deal.price_change_pct!==undefined&&<><span style={{color:'var(--dim)',fontSize:11}}>•</span>
+            <span style={{fontSize:11,color:deal.price_change_pct>=0?'var(--green)':'var(--red)'}}>{deal.price_change_pct}%</span></>}
             <span style={{color:'var(--dim)',fontSize:11}}>•</span>
             {deal.estimated_valuation&&<span style={{fontSize:11,color:'var(--dim)'}}>{deal.estimated_valuation} est. val.</span>}
             {deal.funding_raised&&<><span style={{color:'var(--dim)',fontSize:11}}>•</span>
@@ -308,13 +323,13 @@ export default function QuantAnalyst() {
   const [discordInput,setDiscordInput] = useState('');
   const [logs,setLogs] = useState([]);
   const [notifications,setNotifications] = useState([]);
-  const [marketSummary,setMarketSummary] = useState('Loading live SEC and research data...');
+  const [marketSummary,setMarketSummary] = useState('Loading live catalyst feeds...');
   const [timeSignals,setTimeSignals] = useState([]);
   const [clock,setClock] = useState('');
   const [error,setError] = useState('');
-  const [sources,setSources] = useState({'SEC Filings':true,'Academic Papers':true});
+  const [sources,setSources] = useState(createDefaultSourceSelection);
   const [geoFilter,setGeoFilter] = useState('Global');
-  const [kpis,setKpis] = useState({liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
+  const [kpis,setKpis] = useState(EMPTY_KPIS);
   const [runCount,setRunCount] = useState(0);
   const [selectedDeal,setSelectedDeal] = useState(null);
   const [memoLoading,setMemoLoading] = useState(false);
@@ -339,14 +354,18 @@ export default function QuantAnalyst() {
     setInitialLoading(true);
     setError('');
     try{
-      const res = await fetch(`/api/bootstrap?geoFilter=${encodeURIComponent(geoFilter)}`);
+      const params = new URLSearchParams({
+        geoFilter,
+        sources: JSON.stringify(sources)
+      });
+      const res = await fetch(`/api/bootstrap?${params.toString()}`);
       const data = await res.json();
       if(!res.ok||!data.ok)throw new Error(data.error||`HTTP ${res.status}`);
       setDeals(data.deals||[]);
       setLatestRunDeals([]);
       setMarketSummary(data.marketSummary||'No live summary available.');
       setTimeSignals(data.timeSignals||[]);
-      setKpis(data.kpis||{liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
+      setKpis(data.kpis||EMPTY_KPIS);
       setSourceStatus(data.sourceStatus||[]);
       setWarnings(data.warnings||[]);
       setLastUpdated(data.generatedAt||'');
@@ -354,12 +373,12 @@ export default function QuantAnalyst() {
       addLog('Live dashboard bootstrap completed','success');
     }catch(e){
       setError(e.message);
-      setWarnings(['Live sources failed to load. Check SEC_USER_AGENT, network reachability, and provider availability.']);
+      setWarnings(['Live sources failed to load. Check provider credentials, network reachability, and the setup notes in DATA_SOURCES.md.']);
       addLog(`Bootstrap failed: ${e.message}`,'error');
     }finally{
       setInitialLoading(false);
     }
-  },[geoFilter,addLog]);
+  },[geoFilter,sources,addLog]);
 
   useEffect(()=>{
     loadDashboard();
@@ -453,10 +472,9 @@ export default function QuantAnalyst() {
     await new Promise(r=>setTimeout(r,400));
     addLog('Deploying web intelligence agents...','scan');
     await new Promise(r=>setTimeout(r,300));
-    addLog('Requesting live SEC EDGAR feeds...','scan');
-    addLog('Pulling recent arXiv research matches...','scan');
-    addLog('Normalizing source documents into signal cards...','scan');
-    addLog('Scoring recency, match quality, and source coverage...','system');
+    activeSources.forEach(source=>addLog(SCAN_LOG_BY_SOURCE[source]||`Scanning ${source}...`,'scan'));
+    addLog('Normalizing source documents into catalyst cards...','scan');
+    addLog('Scoring catalyst quality, recency, and breakout confirmation...','system');
 
     try{
       const agentRes = await fetch('/api/run-agent',{
@@ -471,7 +489,7 @@ export default function QuantAnalyst() {
       setLatestRunDeals(liveDeals);
       setMarketSummary(agentData.marketSummary||'No live summary available.');
       setTimeSignals(agentData.timeSignals||[]);
-      setKpis(agentData.kpis||{liveDeals:0,researchSignals:0,avgConfidence:0,sourceCoverage:0,queryLatencyMs:0,diversityIndex:0,ddr:0,ttm:0,apg:0,dix:0,isr:0});
+      setKpis(agentData.kpis||EMPTY_KPIS);
       setSourceStatus(agentData.sourceStatus||[]);
       setWarnings(agentData.warnings||[]);
       setLastUpdated(agentData.generatedAt||'');
@@ -621,11 +639,11 @@ Return ONLY valid JSON, no markdown, no backticks.`;
           <div className="fade-in">
             {/* KPI Row */}
             <div style={{display:'flex',gap:12,marginBottom:24,flexWrap:'wrap'}}>
-              <KPICard label="Live Filing Signals" value={kpis.liveDeals} unit="" sub={`${highConf.length} high-confidence deals`} color='var(--green)'/>
-              <KPICard label="Research Matches" value={kpis.researchSignals} unit="" sub="Recent arXiv thesis hits" color='var(--blue)'/>
+              <KPICard label="Catalyst Signals" value={kpis.liveDeals} unit="" sub={`${highConf.length} high-confidence setups`} color='var(--green)'/>
+              <KPICard label="News Matches" value={kpis.newsSignals} unit="" sub={`${kpis.socialSignals} social-source hits`} color='var(--blue)'/>
               <KPICard label="Source Coverage" value={kpis.sourceCoverage} unit={`/${sourceStatus.length||0}`} sub="Online or warning-state live sources" color='var(--yellow)'/>
-              <KPICard label="Avg Confidence Score" value={avgScore} unit="/100" sub="Recency and thesis-match score" color='var(--orange)'/>
-              <KPICard label="Geographic Diversity" value={geoSpread} unit=" regions" sub={`${[...new Set(deals.map(d=>d.geography))].join(', ')}`} color='var(--purple)'/>
+              <KPICard label="Breakout Candidates" value={kpis.breakoutSignals} unit="" sub="Quote-confirmed names" color='var(--orange)'/>
+              <KPICard label="Avg Confidence Score" value={avgScore} unit="/100" sub={`${geoSpread} regions represented`} color='var(--purple)'/>
             </div>
 
             {/* Market Summary + Signals */}
@@ -806,8 +824,8 @@ Return ONLY valid JSON, no markdown, no backticks.`;
                     <div style={{fontSize:10,color:'var(--dim)',marginTop:4}}>Discord Alerts Sent</div>
                   </div>
                   <div style={{background:'var(--s2)',border:'1px solid var(--border)',borderRadius:6,padding:16,textAlign:'center'}}>
-                    <div style={{fontSize:22,fontFamily:'var(--display)',color:'var(--purple)',fontWeight:700}}>{geoSpread}</div>
-                    <div style={{fontSize:10,color:'var(--dim)',marginTop:4}}>Geographies Covered</div>
+                    <div style={{fontSize:22,fontFamily:'var(--display)',color:'var(--purple)',fontWeight:700}}>{kpis.breakoutSignals}</div>
+                    <div style={{fontSize:10,color:'var(--dim)',marginTop:4}}>Breakout Candidates</div>
                   </div>
                 </div>
               </div>
@@ -979,8 +997,8 @@ Return ONLY valid JSON, no markdown, no backticks.`;
                   {label:'High-Confidence Share',desc:'Signals scoring 70 or higher from live sources',value:`${kpis.ddr}%`,target:'Target: >70%',color:'var(--green)',ok:kpis.ddr>=70},
                   {label:'Scan Latency',desc:'Live source round-trip time for the latest run',value:`${kpis.ttm}min`,target:'Target: <1min',color:'var(--blue)',ok:kpis.ttm<1},
                   {label:'Live Signal Count',desc:'Current opportunities in the active pipeline',value:`${kpis.apg}`,target:'Target: >0',color:'var(--yellow)',ok:kpis.apg>0},
-                  {label:'Research Coverage',desc:'Recent arXiv matches supporting the thesis',value:`${kpis.researchSignals}`,target:'Target: >0',color:'var(--orange)',ok:kpis.researchSignals>0},
-                  {label:'Diversity Index',desc:'Geographic dispersion across current live deals',value:`${kpis.dix.toFixed(2)}`,target:'Target: >0.65',color:'var(--purple)',ok:kpis.dix>=0.65},
+                  {label:'Social Catalysts',desc:'X API matches that cleared the score threshold',value:`${kpis.socialSignals}`,target:'Target: >0',color:'var(--orange)',ok:kpis.socialSignals>0},
+                  {label:'Breakout Candidates',desc:'Quote-confirmed names with breakout score >= 70',value:`${kpis.breakoutSignals}`,target:'Target: >0',color:'var(--purple)',ok:kpis.breakoutSignals>0},
                 ].map(k=>(
                   <div key={k.label} style={{background:'var(--s2)',border:`1px solid ${k.ok?k.color:'var(--border)'}`,borderRadius:8,padding:16,borderTop:`3px solid ${k.color}`}}>
                     <div style={{fontSize:9,color:'var(--dim)',letterSpacing:1,textTransform:'uppercase',marginBottom:8}}>{k.label}</div>

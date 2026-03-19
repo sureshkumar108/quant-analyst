@@ -10,8 +10,15 @@ async function bootstrapRoute(req, res) {
   const url = parseUrl(req);
   const thesis = url.searchParams.get("thesis") || "";
   const geoFilter = url.searchParams.get("geoFilter") || "Global";
+  let sources = {};
 
-  const snapshot = await buildLiveSnapshot({ thesis, geoFilter });
+  try {
+    sources = JSON.parse(url.searchParams.get("sources") || "{}");
+  } catch {
+    sources = {};
+  }
+
+  const snapshot = await buildLiveSnapshot({ thesis, geoFilter, sources });
   sendJson(res, 200, snapshot);
 }
 
